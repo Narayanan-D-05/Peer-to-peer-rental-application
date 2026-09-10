@@ -29,6 +29,13 @@ function MyRentalsPage() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [message, setMessage] = useState("Loading your requests...");
 
+	// Optimistically mutate a single booking's fields in local state
+	const optimisticUpdate = (bookingId, patch) => {
+		setBookings((prev) =>
+			prev.map((b) => (b.bookingId === bookingId ? { ...b, ...patch } : b))
+		);
+	};
+
 	const loadBookings = async () => {
 		const { data } = await supabase.auth.getSession();
 		const renterId = data.session?.user?.id;
@@ -74,6 +81,8 @@ function MyRentalsPage() {
 				condition: "Good",
 				status: "RETURNED",
 			});
+			// Optimistic: update status immediately so UI reflects change at once
+			optimisticUpdate(returnModalBooking.bookingId, { status: "RETURNED" });
 			setReturnModalBooking(null);
 			setReturnRemarks("");
 			setToast({
@@ -81,7 +90,8 @@ function MyRentalsPage() {
 				title: "Return Submitted!",
 				message: "Your return has been recorded. The lender has been notified to verify receipt.",
 			});
-			await loadBookings();
+			// Background sync — no await, UI already updated
+			loadBookings();
 		} catch (error) {
 			console.error("Error returning item:", error);
 			setToast({
@@ -111,6 +121,8 @@ function MyRentalsPage() {
 				rating: Number(reviewRating),
 				comment: fullComment,
 			});
+			// Optimistic: flag this booking as reviewed so the button can hide/change
+			optimisticUpdate(reviewModalBooking.bookingId, { reviewed: true });
 			setReviewModalBooking(null);
 			setReviewRating(5);
 			setReviewComment("");
@@ -120,7 +132,8 @@ function MyRentalsPage() {
 				title: "Review Published!",
 				message: "Thank you! Your feedback helps other borrowers in the community.",
 			});
-			await loadBookings();
+			// Background sync — no await, UI already updated
+			loadBookings();
 		} catch (error) {
 			console.error("Error submitting review:", error);
 			setToast({
